@@ -129,6 +129,7 @@ static struct _if_value
  *  <xb> bit string literal
  *  <xc> extended C-style comments
  *  <xd> delimited identifiers (double-quoted identifiers)
+ *  <xic> backtick quoted identifier in shared SQL/C definitions
  *  <xdc> double-quoted strings in C
  *  <xh> hexadecimal byte string
  *  <xn> national character quoted strings
@@ -153,6 +154,7 @@ static struct _if_value
 %x xc
 %x xd
 %x xdc
+%x xic
 %x xh
 %x xn
 %x xq
@@ -270,6 +272,14 @@ xdstop			{dquote}
 xddouble		{dquote}{dquote}
 xdinside		[^"]+
 
+/* Backtick
+ * Allows for avoiding the usual translation to lowercase of identifiers that represent keywords.
+ */
+backtick		\`
+xistart			{backtick}
+xistop			{backtick}
+xiinside		[^`]+
+
 /* Quoted identifier with Unicode escapes */
 xuistart		[uU]&{dquote}
 
@@ -342,7 +352,7 @@ not_equals		"!="
  * rule for "operator"!
  */
 self			[,()\[\].;\:\+\-\*\/\%\^\<\>\=]
-op_chars		[\~\!\@\#\^\&\|\`\?\+\-\*\/\%\<\>\=]
+op_chars		[\~\!\@\#\^\&\|\?\+\-\*\/\%\<\>\=]
 operator		{op_chars}+
 
 /*
@@ -739,6 +749,11 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 					base_yylval.str = mm_strdup(literalbuf);
 					return CSTRING;
 				}
+<xic>{xistop}	{
+					BEGIN(state_before_str_start);
+					base_yylval.str = mm_strdup(literalbuf);
+					return IDENT;
+				}
 <xui>{dquote}	{
 					BEGIN(state_before_str_start);
 					if (literallen == 0)
@@ -763,6 +778,16 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 					addlit(yytext, yyleng);
 				}
 <xdc><<EOF>>	{ mmfatal(PARSE_ERROR, "unterminated quoted string"); }
+
+<SQL>{xistart}	{
+					state_before_str_start = YYSTATE;
+					BEGIN(xic);
+					startlit();
+				}
+<xic>{xiinside}	{
+					addlit(yytext, yyleng);
+				}
+<xic><<EOF>>	{ mmfatal(PARSE_ERROR, "unterminated backticked identifier"); }
 
 <SQL>{
 {typecast}		{
@@ -861,8 +886,7 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 							char c = yytext[ic];
 							if (c == '~' || c == '!' || c == '@' ||
 								c == '#' || c == '^' || c == '&' ||
-								c == '|' || c == '`' || c == '?' ||
-								c == '%')
+								c == '|' || c == '?' || c == '%')
 								break;
 						}
 						if (ic < 0)
