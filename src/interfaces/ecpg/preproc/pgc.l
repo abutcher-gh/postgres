@@ -973,8 +973,11 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 					mmfatal(PARSE_ERROR, "trailing junk after numeric literal");
 				}
 
-:{identifier}((("->"|\.){identifier})|(\[{array}\]))*	{
-					base_yylval.str = mm_strdup(yytext+1);
+:\*?{identifier}((("->"|\.){identifier})|(\[{array}\]))*	{
+					if (yytext[1] == '*')
+						base_yylval.str = psprintf("%s[0]", yytext+2);
+					else
+						base_yylval.str = mm_strdup(yytext+1);
 					return CVARIABLE;
 				}
 
