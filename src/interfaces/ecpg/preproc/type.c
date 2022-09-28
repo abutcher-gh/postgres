@@ -57,7 +57,8 @@ ECPGstruct_member_dup(struct ECPGstruct_member *rm)
 				if (rm->type->u.element->type == ECPGt_struct || rm->type->u.element->type == ECPGt_union)
 					type = ECPGmake_struct_type(rm->type->u.element->u.members, rm->type->u.element->type, rm->type->u.element->type_name, rm->type->u.element->struct_sizeof);
 				else
-					type = ECPGmake_array_type(ECPGmake_simple_type(rm->type->u.element->type, rm->type->u.element->size, rm->type->u.element->counter), rm->type->size);
+					type = ECPGmake_simple_type(rm->type->u.element->type, rm->type->u.element->size, rm->type->u.element->counter);
+				type = ECPGmake_array_type(type, rm->type->size);
 				break;
 			default:
 				type = ECPGmake_simple_type(rm->type->type, rm->type->size, rm->type->counter);
