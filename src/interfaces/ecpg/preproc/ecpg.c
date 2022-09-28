@@ -131,6 +131,7 @@ main(int argc, char *const argv[])
 	const char *progname;
 	char		my_exec_path[MAXPGPATH];
 	char		include_path[MAXPGPATH];
+	char*		ECPG_INCLUDE_PATH;
 
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("ecpg"));
 
@@ -251,6 +252,18 @@ main(int argc, char *const argv[])
 	}
 
 	add_include_path(".");
+
+	if ((ECPG_INCLUDE_PATH = getenv("ECPG_INCLUDE_PATH")))
+	{
+		#if defined(WIN32) && !defined(__CYGWIN__)
+		const char* path_sep = ";";
+		#else
+		const char* path_sep = ":";
+		#endif
+		for (char* p = strtok(ECPG_INCLUDE_PATH, path_sep); p; p = strtok(NULL, path_sep))
+			add_include_path(p);
+	}
+
 	add_include_path("/usr/local/include");
 	get_include_path(my_exec_path, include_path);
 	add_include_path(include_path);

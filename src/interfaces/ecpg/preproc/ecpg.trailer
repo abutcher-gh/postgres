@@ -972,10 +972,9 @@ variable: opt_pointer ECPGColLabel opt_array_bounds opt_bit_field opt_initialize
 			{
 				case ECPGt_struct:
 				case ECPGt_union:
-					if (atoi(dimension) < 0)
-						type = ECPGmake_struct_type(struct_member_list[struct_level], actual_type[struct_level].type_enum, actual_type[struct_level].type_str, actual_type[struct_level].type_sizeof);
-					else
-						type = ECPGmake_array_type(ECPGmake_struct_type(struct_member_list[struct_level], actual_type[struct_level].type_enum, actual_type[struct_level].type_str, actual_type[struct_level].type_sizeof), dimension);
+					type = ECPGmake_struct_type(struct_member_list[struct_level], actual_type[struct_level].type_enum, actual_type[struct_level].type_str, actual_type[struct_level].type_sizeof);
+					if (atoi(dimension) >= 0)
+						type = ECPGmake_array_type(type, dimension);
 
 					$$ = cat_str(5, $1, mm_strdup($2), $3.str, $4, $5);
 					break;
