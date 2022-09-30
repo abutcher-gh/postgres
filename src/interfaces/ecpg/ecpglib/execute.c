@@ -306,6 +306,7 @@ ecpg_store_result(const PGresult *results, int act_field,
 	enum ARRAY_TYPE isarray;
 	int			act_tuple,
 				ntuples = PQntuples(results);
+	int			struct_tuple_offset = 0;
 	bool		status = true;
 
 	if ((isarray = ecpg_is_type_an_array(PQftype(results, act_field), stmt, var)) == ECPG_ARRAY_ERROR)
@@ -342,7 +343,7 @@ ecpg_store_result(const PGresult *results, int act_field,
 	/*
 	 * allocate memory for NULL pointers
 	 */
-	if ((var->arrsize == 0 || var->varcharsize == 0) && var->value == NULL)
+	if ((var->arrsize <= 0 || var->varcharsize == 0) && var->value == NULL)
 	{
 		int			len = 0;
 
@@ -372,6 +373,18 @@ ecpg_store_result(const PGresult *results, int act_field,
 							if (len > var->varcharsize)
 								var->varcharsize = len;
 						}
+						// var->offset is set to be one more than the maximum
+						// length of the result strings above.  To preserve
+						// inter-element offset if we filling an array of
+						// structs, record that distance now and reset to the
+						// expected offset for chars (i.e. sizeof(char)).  This
+						// will work providing we're not on an exotic machine
+						// where sizeof(char) == sizeof(void*)).
+						if (var->offset != sizeof(char))
+						{
+							struct_tuple_offset = var->offset;
+							var->offset = sizeof(char);
+						}
 						var->offset *= var->varcharsize;
 						len = var->offset * ntuples;
 					}
@@ -395,6 +408,16 @@ ecpg_store_result(const PGresult *results, int act_field,
 		if (!var->value)
 			return false;
 		*((char **) var->pointer) = var->value;
+		if (struct_tuple_offset)
+		{
+			char **p = (char **) var->pointer;
+			char *v = var->value;
+			for (act_tuple = 1; act_tuple < ntuples; ++act_tuple)
+			{
+				p = (char **) (((char *) p) + struct_tuple_offset);
+				*p = (v += var->varcharsize);
+			}
+		}
 	}
 
 	/* allocate indicator variable if needed */
@@ -2116,7 +2139,7 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 			 * pointers to char, so use var->pointer as it is.
 			 */
 			if (var->arrsize == 0 ||
-				(var->varcharsize == 0 && ((var->type != ECPGt_char && var->type != ECPGt_unsigned_char) || (var->arrsize <= 1))))
+				(var->varcharsize == 0 && ((var->type != ECPGt_char && var->type != ECPGt_unsigned_char && var->type != ECPGt_string) || (var->arrsize <= 1))))
 				var->value = *((char **) (var->pointer));
 			else
 				var->value = var->pointer;
@@ -2126,8 +2149,6 @@ ecpg_do_prologue(int lineno, const int compat, const int force_indicator,
 			 * bounds
 			 */
 			/* reset to zero for us */
-			if (var->arrsize < 0)
-				var->arrsize = 0;
 			if (var->varcharsize < 0)
 				var->varcharsize = 0;
 
