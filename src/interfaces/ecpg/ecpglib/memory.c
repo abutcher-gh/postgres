@@ -64,7 +64,10 @@ ecpg_strdup(const char *string, int lineno)
 /* keep a list of memory we allocated for the user */
 struct auto_mem
 {
-	void	   *pointer;
+	union {
+		void *pointer;
+		uintptr_t auto_clear_disabled:1;
+	};
 	struct auto_mem *next;
 };
 
@@ -124,12 +127,22 @@ bool
 ecpg_add_mem(void *ptr, int lineno)
 {
 	struct auto_mem *am = (struct auto_mem *) ecpg_alloc(sizeof(struct auto_mem), lineno);
+	bool auto_clear_disabled = false;
 
 	if (!am)
 		return false;
 
 	am->pointer = ptr;
 	am->next = get_auto_allocs();
+	/* remove the marker bit from the previous head and set on this one */
+	if (am->next)
+	{
+		auto_clear_disabled = am->next->auto_clear_disabled;
+		am->next->auto_clear_disabled = 0;
+	}
+	if (auto_clear_disabled)
+		am->auto_clear_disabled = 1;
+
 	set_auto_allocs(am);
 	return true;
 }
@@ -142,6 +155,14 @@ ECPGfree_auto_mem(void)
 	/* free all memory we have allocated for the user */
 	if (am)
 	{
+		/* reset auto-clear disable flag as this is either user-initiated or as
+		   a result of an error. */
+		if (am->auto_clear_disabled)
+		{
+			ecpg_log("ECPGfree_auto_mem re-enabled auto-clear on exec\n");
+			am->auto_clear_disabled = 0;
+		}
+
 		do
 		{
 			struct auto_mem *act = am;
@@ -155,6 +176,26 @@ ECPGfree_auto_mem(void)
 }
 
 void
+ECPGdisable_auto_mem_clear_on_exec(void)
+{
+	struct auto_mem *am = get_auto_allocs();
+
+	ecpg_log("Disabling auto-free on exec\n");
+
+	if (am)
+	{
+		if (am->auto_clear_disabled)
+			ecpg_log("warning: Logic error: auto-clear on exec already disabled for this thread\n");
+	}
+	else
+	{
+		am = (struct auto_mem *) ecpg_alloc(sizeof(struct auto_mem), 0);
+		set_auto_allocs(am);
+	}
+	am->auto_clear_disabled = 1;
+}
+
+void
 ecpg_clear_auto_mem(void)
 {
 	struct auto_mem *am = get_auto_allocs();
@@ -162,6 +203,12 @@ ecpg_clear_auto_mem(void)
 	/* only free our own structure */
 	if (am)
 	{
+		if (am->auto_clear_disabled)
+		{
+			ecpg_log("Not freeing auto-allocated structures; awaiting ECPGfree_auto_mem()\n");
+			return;
+		}
+
 		do
 		{
 			struct auto_mem *act = am;
