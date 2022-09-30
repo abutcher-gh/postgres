@@ -92,6 +92,11 @@ void	   *ECPGget_var(int number);
 /* dynamic result allocation */
 void		ECPGfree_auto_mem(void);
 
+/* ECPGdisable_auto_mem_clear_on_exec allows for keeping all dynamically
+   allocated memory valid until the next call to ECPGfree_auto_mem().
+   I.e. it is not cleared when starting a subsequent EXEC SQL. */
+void		ECPGdisable_auto_mem_clear_on_exec(void);
+
 #ifdef ENABLE_THREAD_SAFETY
 void		ecpg_pthreads_init(void);
 #endif
