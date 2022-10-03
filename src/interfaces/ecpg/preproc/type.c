@@ -130,6 +130,28 @@ ECPGmake_struct_type(struct ECPGstruct_member *rm, enum ECPGttype type, char *ty
 	return ne;
 }
 
+struct ECPGtype *
+ECPGtype_dup(struct ECPGtype* src)
+{
+	switch (src->type)
+	{
+		case ECPGt_array:
+			{
+				struct ECPGtype *et = src->u.element;
+				enum ECPGttype metatype = et->type;
+				et = metatype == ECPGt_struct || metatype == ECPGt_union
+					? ECPGmake_struct_type(et->u.members, et->type, et->type_name, et->struct_sizeof)
+					: ECPGmake_simple_type(et->type, et->size, et->counter);
+				return ECPGmake_array_type(et, src->size);
+			}
+		case ECPGt_struct:
+		case ECPGt_union:
+			return ECPGmake_struct_type(src->u.members, src->type, src->type_name, src->struct_sizeof);
+		default:
+			return ECPGmake_simple_type(src->type, src->size, src->counter);
+	}
+}
+
 static const char *
 get_type(enum ECPGttype type)
 {
