@@ -41,16 +41,7 @@ find_struct_member(char *name, char *str, struct ECPGstruct_member *members, int
 			if (next == NULL)
 			{
 				/* found the end */
-				switch (members->type->type)
-				{
-					case ECPGt_array:
-						return new_variable(name, ECPGmake_array_type(ECPGmake_simple_type(members->type->u.element->type, members->type->u.element->size, members->type->u.element->counter), members->type->size), brace_level);
-					case ECPGt_struct:
-					case ECPGt_union:
-						return new_variable(name, ECPGmake_struct_type(members->type->u.members, members->type->type, members->type->type_name, members->type->struct_sizeof), brace_level);
-					default:
-						return new_variable(name, ECPGmake_simple_type(members->type->type, members->type->size, members->type->counter), brace_level);
-				}
+				return new_variable(name, ECPGtype_dup(members->type), brace_level);
 			}
 			else
 			{
@@ -88,30 +79,15 @@ find_struct_member(char *name, char *str, struct ECPGstruct_member *members, int
 						if (members->type->type != ECPGt_array)
 							mmfatal(PARSE_ERROR, "incorrectly formed variable \"%s\"", name);
 
-						switch (members->type->u.element->type)
-						{
-							case ECPGt_array:
-								return new_variable(name, ECPGmake_array_type(ECPGmake_simple_type(members->type->u.element->u.element->type, members->type->u.element->u.element->size, members->type->u.element->u.element->counter), members->type->u.element->size), brace_level);
-							case ECPGt_struct:
-							case ECPGt_union:
-								return new_variable(name, ECPGmake_struct_type(members->type->u.element->u.members, members->type->u.element->type, members->type->u.element->type_name, members->type->u.element->struct_sizeof), brace_level);
-							default:
-								return new_variable(name, ECPGmake_simple_type(members->type->u.element->type, members->type->u.element->size, members->type->u.element->counter), brace_level);
-						}
-						break;
+						return new_variable(name, ECPGtype_dup(members->type->u.element), brace_level);
 					case '-':
 						if (members->type->type == ECPGt_array)
 							return find_struct_member(name, ++end, members->type->u.element->u.members, brace_level);
-						else
-							return find_struct_member(name, ++end, members->type->u.members, brace_level);
-						break;
-						break;
+						return find_struct_member(name, ++end, members->type->u.members, brace_level);
 					case '.':
 						if (members->type->type == ECPGt_array)
 							return find_struct_member(name, end, members->type->u.element->u.members, brace_level);
-						else
-							return find_struct_member(name, end, members->type->u.members, brace_level);
-						break;
+						return find_struct_member(name, end, members->type->u.members, brace_level);
 					default:
 						mmfatal(PARSE_ERROR, "incorrectly formed variable \"%s\"", name);
 						break;
@@ -233,16 +209,7 @@ find_variable(char *name)
 					mmfatal(PARSE_ERROR, "variable \"%s\" is not declared", name);
 
 				*next = c;
-				switch (p->type->u.element->type)
-				{
-					case ECPGt_array:
-						return new_variable(name, ECPGmake_array_type(ECPGmake_simple_type(p->type->u.element->u.element->type, p->type->u.element->u.element->size, p->type->u.element->u.element->counter), p->type->u.element->size), p->brace_level);
-					case ECPGt_struct:
-					case ECPGt_union:
-						return new_variable(name, ECPGmake_struct_type(p->type->u.element->u.members, p->type->u.element->type, p->type->u.element->type_name, p->type->u.element->struct_sizeof), p->brace_level);
-					default:
-						return new_variable(name, ECPGmake_simple_type(p->type->u.element->type, p->type->u.element->size, p->type->u.element->counter), p->brace_level);
-				}
+				return new_variable(name, ECPGtype_dup(p->type->u.element), p->brace_level);
 			}
 		}
 		else
