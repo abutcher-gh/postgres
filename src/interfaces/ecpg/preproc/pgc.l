@@ -35,7 +35,6 @@
 
 extern YYSTYPE base_yylval;
 
-static int		xcdepth = 0;	/* depth of nesting in slash-star comments */
 static char	   *dolqstart = NULL;	/* current $foo$ quote start string */
 
 /*
@@ -455,7 +454,6 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 {xcstart}		{
 					token_start = yytext;
 					state_before_str_start = YYSTATE;
-					xcdepth = 0;
 					BEGIN(xc);
 					/* Put back any characters past slash-star; see above */
 					yyless(2);
@@ -465,40 +463,15 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 
 <xc>{
 {xcstart}		{
-					if (state_before_str_start == SQL)
-					{
-						xcdepth++;
-						/* Put back any characters past slash-star; see above */
-						yyless(2);
-						fputs("/_*", yyout);
-					}
-					else if (state_before_str_start == C)
-					{
-						ECHO;
-					}
+					/* Put back any characters past slash-star; see above */
+					yyless(2);
+					fputs("/*", yyout);
 				}
 
 {xcstop}		{
-					if (state_before_str_start == SQL)
-					{
-						if (xcdepth <= 0)
-						{
-							ECHO;
-							BEGIN(SQL);
-							token_start = NULL;
-						}
-						else
-						{
-							xcdepth--;
-							fputs("*_/", yyout);
-						}
-					}
-					else if (state_before_str_start == C)
-					{
-						ECHO;
-						BEGIN(C);
-						token_start = NULL;
-					}
+					ECHO;
+					BEGIN(state_before_str_start);
+					token_start = NULL;
 				}
 
 {xcinside}		{
