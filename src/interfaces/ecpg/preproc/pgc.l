@@ -752,7 +752,7 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 				}
 <xdc><<EOF>>	{ mmfatal(PARSE_ERROR, "unterminated quoted string"); }
 
-<SQL>{xistart}	{
+<C,SQL>{xistart}	{
 					state_before_str_start = YYSTATE;
 					BEGIN(xic);
 					startlit();
