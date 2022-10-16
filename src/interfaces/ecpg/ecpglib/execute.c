@@ -1060,6 +1060,8 @@ ecpg_store_input(const int lineno, const bool force_indicator, const struct vari
 
 			case ECPGt_descriptor:
 			case ECPGt_sqlda:
+			case ECPGt_auto_default:
+				/* Dealt with below */
 				break;
 
 			default:
@@ -1421,11 +1423,58 @@ ecpg_build_params(struct statement *stmt)
 		}
 
 		/*
+		 * if var->type indicates a defaulted parameter, then replace it with
+		 * the default token, renumber subsequent parameters and shift this
+		 * variable off.
+		 */
+		if (var->type == ECPGt_auto_default)
+		{
+			char *newcopy, *tgt, *src = stmt->command, *src_end = src + strlen(src);
+			int next = position;
+
+			/*
+			 * adding strlen("default") is enough as will be removing a ? or $n
+			 * and any subsequent renumbering can only get shorter; e.g. 10 to 9.
+			 */
+			if (!(tgt = newcopy = (char *) ecpg_alloc(strlen(src)
+												+ 7 /*strlen("default")*/
+												, stmt->lineno)))
+			{
+				ecpg_free_params(stmt, false);
+				return false;
+			}
+
+			strncpy(tgt, src, next - 1); tgt += next - 1; src += next;
+			src += strspn(src, "0123456789");
+			strcpy(tgt, "default"); tgt += 7;
+
+			while ((next = next_insert(src, 0, stmt->questionmarks, std_strings)) > 0)
+			{
+				int ph;
+				strncpy(tgt, src, next); tgt += next; src += next + 1;
+				next = strspn(src, "0123456789");
+				if (next > 0)
+				{
+					sscanf(src, "%d", &ph);
+					tgt += sprintf(tgt, "$%d", ph-1);
+					src += next;
+				}
+				else
+					*tgt++ = '?';
+			}
+			if (src < src_end)
+				strncpy(tgt, src, src_end - src);
+
+			ecpg_free(stmt->command);
+			stmt->command = newcopy;
+		}
+
+		/*
 		 * if var->type=ECPGt_char_variable we have a dynamic cursor we have
 		 * to simulate a dynamic cursor because there is no backend
 		 * functionality for it
 		 */
-		if (var->type == ECPGt_char_variable)
+		else if (var->type == ECPGt_char_variable)
 		{
 			int			ph_len = (stmt->command[position] == '?') ? strlen("?") : strlen("$1");
 

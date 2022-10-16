@@ -62,6 +62,7 @@ ECPGstruct_member_dup(struct ECPGstruct_member *rm)
 				break;
 			default:
 				type = ECPGmake_simple_type(rm->type->type, rm->type->size, rm->type->counter);
+				type->auto_default = rm->type->auto_default;
 				break;
 		}
 
@@ -104,6 +105,7 @@ ECPGmake_simple_type(enum ECPGttype type, char *size, int counter)
 	ne->u.element = NULL;
 	ne->struct_sizeof = NULL;
 	ne->counter = counter;		/* only needed for varchar and bytea */
+	ne->auto_default = false;	/* only set for basic types that bind to SERIALs */
 
 	return ne;
 }
@@ -148,7 +150,11 @@ ECPGtype_dup(struct ECPGtype* src)
 		case ECPGt_union:
 			return ECPGmake_struct_type(src->u.members, src->type, src->type_name, src->struct_sizeof);
 		default:
-			return ECPGmake_simple_type(src->type, src->size, src->counter);
+			{
+				struct ECPGtype *et = ECPGmake_simple_type(src->type, src->size, src->counter);
+				et->auto_default = src->auto_default; /* only supported for plain types */
+				return et;
+			}
 	}
 }
 
@@ -256,7 +262,7 @@ get_type(enum ECPGttype type)
  */
 static void ECPGdump_a_simple(FILE *o, const char *name, enum ECPGttype type,
 							  char *varcharsize,
-							  char *arrsize, const char *size, const char *prefix, int);
+							  char *arrsize, const char *size, const char *prefix, int, bool);
 static void ECPGdump_a_struct(FILE *o, const char *name, const char *ind_name, char *arrsize,
 							  struct ECPGtype *type, struct ECPGtype *ind_type, const char *prefix, const char *ind_prefix);
 
@@ -329,7 +335,7 @@ ECPGdump_a_type(FILE *o, const char *name, struct ECPGtype *type, const int brac
 					ECPGdump_a_simple(o, name,
 									  type->u.element->type,
 									  type->u.element->size, type->size, struct_sizeof ? struct_sizeof : NULL,
-									  prefix, type->u.element->counter);
+									  prefix, type->u.element->counter, type->u.element->auto_default);
 
 					if (ind_type != NULL)
 					{
@@ -337,13 +343,13 @@ ECPGdump_a_type(FILE *o, const char *name, struct ECPGtype *type, const int brac
 						{
 							char	   *str_neg_one = mm_strdup("-1");
 
-							ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, str_neg_one, NULL, ind_prefix, 0);
+							ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, str_neg_one, NULL, ind_prefix, 0, false);
 							free(str_neg_one);
 						}
 						else
 						{
 							ECPGdump_a_simple(o, ind_name, ind_type->u.element->type,
-											  ind_type->u.element->size, ind_type->size, NULL, ind_prefix, 0);
+											  ind_type->u.element->size, ind_type->size, NULL, ind_prefix, 0, false);
 						}
 					}
 			}
@@ -375,9 +381,9 @@ ECPGdump_a_type(FILE *o, const char *name, struct ECPGtype *type, const int brac
 				if (indicator_set && (ind_type->type == ECPGt_struct || ind_type->type == ECPGt_array))
 					mmfatal(INDICATOR_NOT_SIMPLE, "indicator for simple data type has to be simple");
 
-				ECPGdump_a_simple(o, name, type->type, str_varchar_one, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : str_arr_one, struct_sizeof, prefix, 0);
+				ECPGdump_a_simple(o, name, type->type, str_varchar_one, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : str_arr_one, struct_sizeof, prefix, 0, type->auto_default);
 				if (ind_type != NULL)
-					ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : str_neg_one, ind_struct_sizeof, ind_prefix, 0);
+					ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : str_neg_one, ind_struct_sizeof, ind_prefix, 0, false);
 
 				free(str_varchar_one);
 				free(str_arr_one);
@@ -396,9 +402,9 @@ ECPGdump_a_type(FILE *o, const char *name, struct ECPGtype *type, const int brac
 				if (indicator_set && (ind_type->type == ECPGt_struct || ind_type->type == ECPGt_array))
 					mmfatal(INDICATOR_NOT_SIMPLE, "indicator for simple data type has to be simple");
 
-				ECPGdump_a_simple(o, name, type->type, NULL, str_neg_one, NULL, prefix, 0);
+				ECPGdump_a_simple(o, name, type->type, NULL, str_neg_one, NULL, prefix, 0, type->auto_default);
 				if (ind_type != NULL)
-					ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, ind_type_neg_one, NULL, ind_prefix, 0);
+					ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, ind_type_neg_one, NULL, ind_prefix, 0, false);
 
 				free(str_neg_one);
 				free(ind_type_neg_one);
@@ -416,9 +422,9 @@ ECPGdump_a_type(FILE *o, const char *name, struct ECPGtype *type, const int brac
 				if (indicator_set && (ind_type->type == ECPGt_struct || ind_type->type == ECPGt_array))
 					mmfatal(INDICATOR_NOT_SIMPLE, "indicator for simple data type has to be simple");
 
-				ECPGdump_a_simple(o, name, type->type, type->size, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : str_neg_one, struct_sizeof, prefix, type->counter);
+				ECPGdump_a_simple(o, name, type->type, type->size, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : str_neg_one, struct_sizeof, prefix, type->counter, type->auto_default);
 				if (ind_type != NULL)
-					ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : ind_type_neg_one, ind_struct_sizeof, ind_prefix, 0);
+					ECPGdump_a_simple(o, ind_name, ind_type->type, ind_type->size, (arr_str_size && strcmp(arr_str_size, "0") != 0) ? arr_str_size : ind_type_neg_one, ind_struct_sizeof, ind_prefix, 0, false);
 
 				free(str_neg_one);
 				free(ind_type_neg_one);
@@ -436,8 +442,13 @@ ECPGdump_a_simple(FILE *o, const char *name, enum ECPGttype type,
 				  char *arrsize,
 				  const char *size,
 				  const char *prefix,
-				  int counter)
+				  int counter,
+				  bool auto_default)
 {
+	/* SERIAL defaulting only applies when writing to the database,
+	   not reading from it. */
+	if (dumping_result_variables)
+		auto_default = false;
 	if (type == ECPGt_NO_INDICATOR)
 		fprintf(o, "\n\tECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ");
 	else if (type == ECPGt_descriptor)
@@ -588,10 +599,25 @@ ECPGdump_a_simple(FILE *o, const char *name, enum ECPGttype type,
 		 * If size i.e. the size of structure of which this variable is part
 		 * of, that gives the offset to the next element, if required
 		 */
-		if (size == NULL || strlen(size) == 0)
-			fprintf(o, "\n\t%s,%s,(long)%s,(long)%s,%s, ", get_type(type), variable, varcharsize, arrsize, offset);
-		else
-			fprintf(o, "\n\t%s,%s,(long)%s,(long)%s,%s, ", get_type(type), variable, varcharsize, arrsize, size);
+		{
+			bool has_size = (size != NULL && strlen(size) != 0);
+			fputs("\n\t", o);
+			if (auto_default)
+			{
+				if (explicit_condition)
+				{
+					if (explicit_condition[0] == '\0')
+						fputs(get_type(type), o);
+					else
+						fprintf(o, "%s? %s : -1", explicit_condition, get_type(type));
+				}
+				else
+					fputs("-1", o);
+			}
+			else
+				fputs(get_type(type), o);
+			fprintf(o, ",%s,(long)%s,(long)%s,%s, ", variable, varcharsize, arrsize, has_size? size : offset);
+		}
 
 		free(variable);
 		free(offset);

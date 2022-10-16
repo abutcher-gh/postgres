@@ -157,6 +157,12 @@ sub main
 
 		chomp;
 
+		# inject opt_explicit into the syntax from the backend's gram.y
+		if (/VALUES '\('/)
+		{
+			s/VALUES/VALUES opt_explicit/;
+		}
+
 		# comment out the line below to make the result file match (blank line wise)
 		# the prior version.
 		#next if ($_ eq '');

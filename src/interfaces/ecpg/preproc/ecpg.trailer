@@ -517,6 +517,12 @@ opt_bit_field:	':' Iconst	{ $$ =cat2_str(mm_strdup(":"), $2); }
 		| /* EMPTY */	{ $$ = EMPTY; }
 		;
 
+/* FIXME: currently only support ecpg::default; if other C attrs are used they
+ * will be lost, but it is expected that won't be the case in common usage. */
+opt_auto_default: S_ATTR_SPEC { $$ = strstr($1, "ecpg::default") != NULL; }
+		| /* EMPTY */   { $$ = 0; }
+		;
+
 storage_declaration: storage_clause storage_modifier
 			{$$ = cat2_str ($1, $2); }
 		| storage_clause		{$$ = $1; }
@@ -957,7 +963,7 @@ variable_list: variable
 		}
 		;
 
-variable: opt_pointer ECPGColLabel opt_array_bounds opt_bit_field opt_initializer
+variable: opt_pointer ECPGColLabel opt_array_bounds opt_bit_field opt_auto_default opt_initializer
 		{
 			struct ECPGtype * type;
 			char *dimension = $3.index1;	/* dimension of array */
@@ -966,6 +972,7 @@ variable: opt_pointer ECPGColLabel opt_array_bounds opt_bit_field opt_initialize
 			char *vcn;
 			int *varlen_type_counter;
 			char *struct_name;
+			bool auto_default = $5;
 
 			adjust_array(actual_type[struct_level].type_enum, &dimension, &length, actual_type[struct_level].type_dimension, actual_type[struct_level].type_index, strlen($1), false);
 			switch (actual_type[struct_level].type_enum)
@@ -976,7 +983,7 @@ variable: opt_pointer ECPGColLabel opt_array_bounds opt_bit_field opt_initialize
 					if (atoi(dimension) >= 0)
 						type = ECPGmake_array_type(type, dimension);
 
-					$$ = cat_str(5, $1, mm_strdup($2), $3.str, $4, $5);
+					$$ = cat_str(5, $1, mm_strdup($2), $3.str, $4, $6);
 					break;
 
 				case ECPGt_varchar:
@@ -1008,9 +1015,9 @@ variable: opt_pointer ECPGColLabel opt_array_bounds opt_bit_field opt_initialize
 					vcn = (char *) mm_alloc(sizeof(int) * CHAR_BIT * 10 / 3);
 					sprintf(vcn, "%d", *varlen_type_counter);
 					if (strcmp(dimension, "0") == 0)
-						$$ = cat_str(7, make2_str(mm_strdup(struct_name), vcn), mm_strdup(" { int len; char arr["), mm_strdup(length), mm_strdup("]; } *"), mm_strdup($2), $4, $5);
+						$$ = cat_str(7, make2_str(mm_strdup(struct_name), vcn), mm_strdup(" { int len; char arr["), mm_strdup(length), mm_strdup("]; } *"), mm_strdup($2), $4, $6);
 					else
-						$$ = cat_str(8, make2_str(mm_strdup(struct_name), vcn), mm_strdup(" { int len; char arr["), mm_strdup(length), mm_strdup("]; } "), mm_strdup($2), dim_str, $4, $5);
+						$$ = cat_str(8, make2_str(mm_strdup(struct_name), vcn), mm_strdup(" { int len; char arr["), mm_strdup(length), mm_strdup("]; } "), mm_strdup($2), dim_str, $4, $6);
 					(*varlen_type_counter)++;
 					break;
 
@@ -1019,30 +1026,33 @@ variable: opt_pointer ECPGColLabel opt_array_bounds opt_bit_field opt_initialize
 				case ECPGt_string:
 					if (atoi(dimension) == -1)
 					{
-						int i = strlen($5);
+						int i = strlen($6);
 
 						if (atoi(length) == -1 && i > 0) /* char <var>[] = "string" */
 						{
 							/* if we have an initializer but no string size set, let's use the initializer's length */
 							free(length);
 							length = mm_alloc(i+sizeof("sizeof()"));
-							sprintf(length, "sizeof(%s)", $5+2);
+							sprintf(length, "sizeof(%s)", $6+2);
 						}
 						type = ECPGmake_simple_type(actual_type[struct_level].type_enum, length, 0);
 					}
 					else
 						type = ECPGmake_array_type(ECPGmake_simple_type(actual_type[struct_level].type_enum, length, 0), dimension);
 
-					$$ = cat_str(5, $1, mm_strdup($2), $3.str, $4, $5);
+					$$ = cat_str(5, $1, mm_strdup($2), $3.str, $4, $6);
 					break;
 
 				default:
 					if (atoi(dimension) < 0)
+					{
 						type = ECPGmake_simple_type(actual_type[struct_level].type_enum, mm_strdup("1"), 0);
+						type->auto_default = auto_default; /* only supported for basic types */
+					}
 					else
 						type = ECPGmake_array_type(ECPGmake_simple_type(actual_type[struct_level].type_enum, mm_strdup("1"), 0), dimension);
 
-					$$ = cat_str(5, $1, mm_strdup($2), $3.str, $4, $5);
+					$$ = cat_str(5, $1, mm_strdup($2), $3.str, $4, $6);
 					break;
 			}
 
@@ -1744,6 +1754,10 @@ ECPGunreserved_interval: DAY_P				{ $$ = mm_strdup("day"); }
 		;
 
 
+opt_explicit:	SQL_EXPLICIT { explicit_condition = $1; $$ = EMPTY; }
+		| /* EMPTY */	{ explicit_condition = NULL; $$ = EMPTY; }
+		;
+
 into_list : coutputvariable | into_list ',' coutputvariable
 		;
 
@@ -1966,7 +1980,7 @@ execute_rest: /* EMPTY */	{ $$ = EMPTY; }
 	| ecpg_into				{ $$ = EMPTY; }
 	;
 
-ecpg_into: INTO into_list	{ $$ = EMPTY; }
+ecpg_into: INTO { ++dumping_result_variables; } into_list { --dumping_result_variables; $$ = EMPTY; }
 	| into_descriptor		{ $$ = $1; }
 	;
 
