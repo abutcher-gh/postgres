@@ -30,6 +30,9 @@ struct ECPGtype
 		struct ECPGstruct_member *members;	/* A pointer to a list of members. */
 	}			u;
 	int			counter;
+	bool		auto_default;	/* Whether to convert members marked [[ecpg::default]]
+								   to default automatically.  Can be overridden by
+								   specifying the explicit token at exec time. */
 };
 
 /* Everything is malloced. */

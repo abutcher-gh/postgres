@@ -421,6 +421,8 @@ elif			[eE][lL][iI][fF]
 endif			[eE][nN][dD][iI][fF]
 
 struct			[sS][tT][rR][uU][cC][tT]
+explicit		[eE][xX][pP][lL][iI][cC][iI][tT]
+explicit_cond	[eE][xX][pP][lL][iI][cC][iI][tT]{space}+[iI][fF]{space}*\([^)]+\)
 
 exec_sql		{exec}{space}*{sql}{space}*
 ipdigit			({digit}|{digit}{digit}|{digit}{digit}{digit})
@@ -953,6 +955,14 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 					yyless(yyleng - 2);
 					return process_integer_literal(yytext, &base_yylval);
 				}
+{explicit}	{
+					base_yylval.str = mm_strdup("");
+					return SQL_EXPLICIT;
+				}
+{explicit_cond}	{
+					base_yylval.str = mm_strdup(strstr(yytext, "if") + 2);
+					return SQL_EXPLICIT;
+				}
 } /* <C,SQL> */
 
 <SQL>{
@@ -1119,6 +1129,12 @@ cppline			{space}*#([^i][A-Za-z]*|{if}|{ifdef}|{ifndef}|{import})((\/\*[^*/]*\*+
 <C,xskip>{space}		{ ECHO; }
 <C>\{				{ return '{'; }
 <C>\}				{ return '}'; }
+<C,SQL>\[\[[^\]]*\]\]		{
+					memmove(yytext, yytext+2, yyleng-4);
+					yytext[yyleng-4] = 0;
+					base_yylval.str = mm_strdup(yytext);
+					return S_ATTR_SPEC;
+				}
 <C>\[				{ return '['; }
 <C>\]				{ return ']'; }
 <C>\=				{ return '='; }

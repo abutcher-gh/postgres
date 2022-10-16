@@ -75,6 +75,8 @@
 %type <str> Iresult
 %type <str> on_off
 %type <str> opt_bit_field
+%type <ival> opt_auto_default
+%type <str> opt_explicit
 %type <str> opt_connection_name
 %type <str> opt_database_name
 %type <str> opt_ecpg_into
@@ -125,6 +127,8 @@
 %type <str> SCONST
 %type <str> XCONST
 %type <str> IDENT
+%type <str> S_ATTR_SPEC
+%type <str> SQL_EXPLICIT
 
 %type  <struct_union> s_struct_union_symbol
 

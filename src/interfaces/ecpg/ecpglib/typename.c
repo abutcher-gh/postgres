@@ -18,6 +18,8 @@ ecpg_type_name(enum ECPGttype typ)
 {
 	switch (typ)
 	{
+		case ECPGt_auto_default:
+			return "<<default>>";
 		case ECPGt_char:
 		case ECPGt_string:
 			return "char";

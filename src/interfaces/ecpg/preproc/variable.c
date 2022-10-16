@@ -322,6 +322,10 @@ remove_variables(int brace_level)
 	}
 }
 
+/*
+ * Set by opt_explicit.  NULL if defaults apply.  "" if explicit.  "(some C expr)" if conditionally explicit.
+ */
+char *explicit_condition = NULL;
 
 /*
  * Here are the variables that need to be handled on every request.

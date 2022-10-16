@@ -40,6 +40,7 @@ extern "C"
 
 enum ECPGttype
 {
+	ECPGt_auto_default = -1,	/* field tagged with [[ecpg::default]] attribute */
 	ECPGt_char = 1, ECPGt_unsigned_char, ECPGt_short, ECPGt_unsigned_short,
 	ECPGt_int, ECPGt_unsigned_int, ECPGt_long, ECPGt_unsigned_long,
 	ECPGt_long_long, ECPGt_unsigned_long_long,
