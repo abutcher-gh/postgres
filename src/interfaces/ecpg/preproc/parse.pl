@@ -51,7 +51,8 @@ my %replace_token = (
 	'Sconst' => 'ecpg_sconst',
 	'XCONST' => 'ecpg_xconst',
 	'IDENT'  => 'ecpg_ident',
-	'PARAM'  => 'ecpg_param',);
+	'PARAM'  => 'ecpg_param',
+	'markwhere' => '{ arg_before_where = (uintptr_t) argsinsert; }',);
 
 # or in the block
 my %replace_string = (
@@ -158,10 +159,10 @@ sub main
 		chomp;
 
 		# inject opt_explicit into the syntax from the backend's gram.y
-		if (/VALUES '\('/)
-		{
-			s/VALUES/VALUES opt_explicit/;
-		}
+		s/VALUES/VALUES opt_explicit/ if (/VALUES '\('/);
+
+		# inject WHERE marker to prevent substituting 'default' in where expressions.
+		s/WHERE ([a'])/WHERE markwhere $1/;
 
 		# comment out the line below to make the result file match (blank line wise)
 		# the prior version.
@@ -454,6 +455,10 @@ sub main
 						push(@fields, lc($S));
 					}
 				}
+				elsif ($arr[$fieldIndexer] =~ /^{/)
+				{
+					push(@fields, '""');
+				}
 				else
 				{
 					push(@fields, '$' . (scalar(@fields) + 1));
@@ -542,7 +547,6 @@ sub dump_fields
 
 	if ($mode == 0)
 	{
-
 		#Normal
 		add_to_buffer('rules', $ln);
 		if ($feature_not_supported == 1)

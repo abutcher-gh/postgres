@@ -6,7 +6,7 @@
 
 static void output_escaped_str(char *cmd, bool quoted);
 
-int dumping_result_variables = 0;
+int dumping_input_variables = 0;
 
 void
 output_line_number(void)
@@ -158,11 +158,11 @@ output_statement(char *stmt, int whenever_mode, enum ECPG_statement_type st)
 	}
 
 	/* dump variables to C file */
+	++dumping_input_variables;
 	dump_variables(argsinsert, 1);
+	--dumping_input_variables;
 	fputs("ECPGt_EOIT, ", base_yyout);
-	++dumping_result_variables;
 	dump_variables(argsresult, 1);
-	--dumping_result_variables;
 	fputs("ECPGt_EORT);", base_yyout);
 	reset_variables();
 

@@ -1980,7 +1980,7 @@ execute_rest: /* EMPTY */	{ $$ = EMPTY; }
 	| ecpg_into				{ $$ = EMPTY; }
 	;
 
-ecpg_into: INTO { ++dumping_result_variables; } into_list { --dumping_result_variables; $$ = EMPTY; }
+ecpg_into: INTO into_list	{ $$ = EMPTY; }
 	| into_descriptor		{ $$ = $1; }
 	;
 
