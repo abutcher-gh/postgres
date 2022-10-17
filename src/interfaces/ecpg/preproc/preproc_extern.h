@@ -52,6 +52,8 @@ extern struct ECPGtype ecpg_no_indicator;
 extern struct variable no_indicator;
 extern struct arguments *argsinsert;
 extern struct arguments *argsresult;
+extern uintptr_t arg_before_where;
+extern bool in_where;
 extern struct when when_error,
 			when_nf,
 			when_warn;
@@ -94,7 +96,7 @@ extern void add_variable_to_head(struct arguments **, struct variable *, struct 
 extern void add_variable_to_tail(struct arguments **, struct variable *, struct variable *);
 extern void remove_variable_from_list(struct arguments **list, struct variable *var);
 extern void dump_variables(struct arguments *, int);
-extern int dumping_result_variables;
+extern int dumping_input_variables;
 extern struct typedefs *get_typedef(const char *name, bool noerror);
 extern void adjust_array(enum ECPGttype, char **, char **, char *, char *, int, bool);
 extern void reset_variables(void);
