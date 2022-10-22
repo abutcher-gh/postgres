@@ -335,8 +335,7 @@ char *explicit_condition = NULL;
 
 struct arguments *argsinsert = NULL;
 struct arguments *argsresult = NULL;
-uintptr_t arg_before_where = ~(uintptr_t)0;
-bool in_where = false;
+int inserting = 0;
 
 void
 reset_variables(void)
@@ -344,8 +343,7 @@ reset_variables(void)
 	explicit_condition = NULL;
 	argsinsert = NULL;
 	argsresult = NULL;
-	arg_before_where = ~(uintptr_t)0;
-	in_where = false;
+	inserting = 0;
 }
 
 /* Insert a new variable into our request list.
@@ -426,9 +424,6 @@ dump_variables(struct arguments *list, int mode)
 	 */
 
 	dump_variables(list->next, mode);
-
-	if (!in_where && list->next == (void*) arg_before_where)
-		in_where = true;
 
 	/* Then the current element and its indicator */
 	ECPGdump_a_type(base_yyout, list->variable->name, list->variable->type, list->variable->brace_level,

@@ -52,7 +52,7 @@ my %replace_token = (
 	'XCONST' => 'ecpg_xconst',
 	'IDENT'  => 'ecpg_ident',
 	'PARAM'  => 'ecpg_param',
-	'markwhere' => '{ arg_before_where = (uintptr_t) argsinsert; }',);
+	'mark-insert' => '{ ++inserting; }',);
 
 # or in the block
 my %replace_string = (
@@ -161,8 +161,8 @@ sub main
 		# inject opt_explicit into the syntax from the backend's gram.y
 		s/VALUES/VALUES opt_explicit/ if (/VALUES '\('/);
 
-		# inject WHERE marker to prevent substituting 'default' in where expressions.
-		s/WHERE ([a'])/WHERE markwhere $1/;
+		# only trigger auto-defaulting for insert statements
+		s/INSERT INTO/$& mark-insert/;
 
 		# comment out the line below to make the result file match (blank line wise)
 		# the prior version.
@@ -457,7 +457,7 @@ sub main
 				}
 				elsif ($arr[$fieldIndexer] =~ /^{/)
 				{
-					push(@fields, '""');
+					push(@fields, '');
 				}
 				else
 				{
@@ -598,7 +598,7 @@ sub dump_fields
 						last;
 					}
 					$z++;
-					$str = $str . ' ' . $flds->[$z];
+					$str = $str . ' ' . $flds->[$z] if length $flds->[$z];
 				}
 			}
 
