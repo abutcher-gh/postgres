@@ -447,7 +447,7 @@ ECPGdump_a_simple(FILE *o, const char *name, enum ECPGttype type,
 {
 	/* SERIAL defaulting only applies when writing to the database,
 	   not reading from it. */
-	if (!dumping_input_variables || in_where)
+	if (!inserting || !dumping_input_variables)
 		auto_default = false;
 	if (type == ECPGt_NO_INDICATOR)
 		fprintf(o, "\n\tECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ");

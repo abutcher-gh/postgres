@@ -52,8 +52,7 @@ extern struct ECPGtype ecpg_no_indicator;
 extern struct variable no_indicator;
 extern struct arguments *argsinsert;
 extern struct arguments *argsresult;
-extern uintptr_t arg_before_where;
-extern bool in_where;
+extern int inserting;
 extern struct when when_error,
 			when_nf,
 			when_warn;
